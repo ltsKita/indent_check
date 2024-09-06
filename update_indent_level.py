@@ -12,7 +12,7 @@ patterns = {
     3: r"^\d+\.\d+\.\d+(?!\.\d)\s*.*$",  # レベル3: 例 "1.1.1", "10.2.3"
     4: r"^\d+\.\d+\.\d+\.\d+\s*.*$",     # レベル4: 例 "1.1.1.1", "10.2.3.4"
     5: r"^\(\d+\)\s*.*$",                # レベル5: 例 "(1)", "(10)"
-    6: r"^[ａ-ｚ]\.\s*.*$",              # レベル6: 例 "ａ．"
+    6: r"^[ａ-ｚ]\．\s*.*$",              # レベル6: 例 "ａ．"
     7: r"^\([a-z]\)\s*.*$",              # レベル7: 例 "(a)"
     8: r"^\([a-z]-\d+\)\s*.*$",          # レベル8: 例 "(a-1)"
     9: r"^\([a-z]-\d+-\d+\)\s*.*$"       # レベル9: 例 "(a-1-1)"
@@ -70,27 +70,19 @@ def update_indent(paragraph, level, is_number):
     if pPr is None:
         pPr = ET.SubElement(paragraph, "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}pPr")
     
+    # 既存の <w:ind> を削除
     ind = pPr.find(".//w:ind", namespaces=ns)
-    
+    if ind is not None:
+        pPr.remove(ind)
+
     # is_number に基づいてインデント設定を取得
     settings = indent_settings_numbers.get(level) if is_number else indent_settings_paragraphs.get(level)
 
+    # 新しいインデント設定を追加
     if settings:
-        if ind is not None:
-            # 重複キーを防ぐため、既存のキーを検査し、異なる場合にのみ更新
-            for attr, value in settings.items():
-                if attr in ind.attrib:
-                    # 既存の値が異なる場合のみ更新
-                    if ind.get(attr) != value:
-                        ind.set(attr, value)
-                else:
-                    # 属性が存在しない場合に新規追加
-                    ind.set(attr, value)
-        else:
-            # インデント要素がない場合に新たに追加
-            new_ind = ET.SubElement(pPr, "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}ind")
-            for attr, value in settings.items():
-                new_ind.set(attr, value)
+        new_ind = ET.SubElement(pPr, "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}ind")
+        for attr, value in settings.items():
+            new_ind.set(attr, value)
 
 def process_xml(xml_content):
     """
@@ -144,7 +136,7 @@ with open(xml_file_path, "w", encoding="utf-8") as file:
     file.write(updated_xml)
 
 # ログの出力
-log_file_path = "xml_new/word/indentation_log.txt"
+log_file_path = "indentation_log.txt"
 with open(log_file_path, "w", encoding="utf-8") as file:
     file.write("\n".join(log))
 

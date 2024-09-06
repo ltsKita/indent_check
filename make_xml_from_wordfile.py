@@ -54,10 +54,9 @@ def extract_docx_to_xml(docx_file, output_dir):
                 new_runs.append(r)
                 continue
 
-            # <w:tab> や <w:br w:type="page">、<w:t xml:space="preserve"> が出現した場合、順序を保ってそのまま保持
+            # <w:br w:type="page"> や <w:tab> をそのまま保持
             if r.find('w:tab', namespaces=namespace) is not None or \
-               r.find('.//w:br[@w:type="page"]', namespaces=namespace) is not None or \
-               (t_element is not None and 'preserve' in t_element.attrib.get('{http://www.w3.org/XML/1998/namespace}space', '')):
+               r.find('.//w:br[@w:type="page"]', namespaces=namespace) is not None:
                 
                 # これまでのテキストを保存
                 if combined_text and first_r is not None:
@@ -73,6 +72,7 @@ def extract_docx_to_xml(docx_file, output_dir):
                 first_r = None  # リセットして次の結合開始地点を設定する
 
             else:
+                # <w:t xml:space="preserve"> も含めて結合
                 if t_element is not None and t_element.text is not None:
                     if first_r is None:
                         first_r = r  # 最初の <w:r> を保存
