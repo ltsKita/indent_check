@@ -1,3 +1,7 @@
+"""
+このファイルでは項目番号を修復します。
+具体的には括弧やピリオド、スペースの設定がルール通りでない項目番号を検出し、修正します。
+"""
 import re
 from lxml import etree as ET
 
@@ -38,8 +42,12 @@ def highlight_text(run):
     new_highlight = ET.SubElement(rPr, '{http://schemas.openxmlformats.org/wordprocessingml/2006/main}highlight')
     new_highlight.set('{http://schemas.openxmlformats.org/wordprocessingml/2006/main}val', 'yellow')
 
-def process_numbering(paragraph, log):
-    """レベル1〜4の項目番号の後に全角スペースを1つだけ挿入。既に全角スペースがある場合は何もしない。"""
+def adjust_space_level1_4(paragraph, log):
+    """
+    レベル1〜4の項目番号の後に全角スペースを1つだけ挿入する。
+    既に全角スペースがある場合は何もしない。
+    スペースが連続して入っている場合、それらを削除する。
+    """
     runs = paragraph.findall(".//w:r", namespaces=ns)
 
     for run_index, run in enumerate(runs):
@@ -56,7 +64,7 @@ def process_numbering(paragraph, log):
                 break
 
         if skip:
-            continue  # <w:tab/>が見つかった場合、この<w:t>の処理をスキップ
+            continue  # <w:tab/>が見つかった場合、項目番号ではないためこの<w:t>の処理をスキップ
 
         original_text = w_t.text.strip()
 
@@ -77,10 +85,14 @@ def process_numbering(paragraph, log):
                         log.append(log_entry)
                         highlight_text(run)
 
-def process_fullwidth_alphabet_period(paragraph, log):
-    """w:t要素の先頭が全角小文字アルファベットで、その直後に全角または半角のピリオドがある場合の処理"""
+def adjust_level6(paragraph, log):
+    """
+    レベル6の場合の処理
+    全角アルファベットの直後のピリオドやスペースを修正します。
+
+    """
     runs = paragraph.findall(".//w:r", namespaces=ns)
-    
+    # テキストを取得する
     for run in runs:
         w_t = run.find(".//w:t", namespaces=ns)
         if w_t is None or not w_t.text:
@@ -97,7 +109,7 @@ def process_fullwidth_alphabet_period(paragraph, log):
             # ピリオドがない場合
             if not after_letter.startswith("．") and not after_letter.startswith("."):
                 # 全角ピリオドを追加
-                new_text = f"{letter}．{after_letter.strip()}"  # ピリオド後の余分なスペースも削除
+                new_text = f"{letter}．{after_letter.strip()}"
 
                 if new_text != original_text:
                     w_t.text = new_text
@@ -129,8 +141,10 @@ def process_fullwidth_alphabet_period(paragraph, log):
                     log.append(log_entry)
                     highlight_text(run)
 
-def complete_brackets(paragraph, log):
-    """レベル5,7,8,9のカッコを補完する処理。項目番号がある場合のみ片方のカッコを補完"""
+def adjust_brackets_level5_9(paragraph, log):
+    """
+    レベル5,7,8,9のカッコを補完する処理。項目番号がある場合のみ片方のカッコを補完
+    """
     runs = paragraph.findall(".//w:r", namespaces=ns)
     
     for run in runs:
@@ -175,15 +189,15 @@ def complete_brackets(paragraph, log):
 
         # スペース処理
         # カッコ補完が行われた項目番号に一致するものだけ処理
-        item_number_match = re.match(r"^\([a-zA-Z0-9]+\)|^\([a-z]\)|^[a-z]\)", new_text)  # b), (b), etc.
+        item_number_match = re.match(r"^\([a-zA-Z0-9]+\)|^\([a-z]\)|^[a-z]\)", new_text)  # b)の場合、(b)として欠けている括弧を補完する
 
         if item_number_match:
             # 項目番号の後の文字列を取得（スペースや文字列をそのまま取得）
             after_item_number = new_text[len(item_number_match.group(0)):]  # 項目番号の後ろをそのまま取得
 
-            # 1つの半角スペースが既に存在する場合は何もしない
+            # 正しく半角スペースが置かれている場合は何もしない
             if after_item_number.startswith(" "):
-                continue  # 正しいスペースが1つだけの場合はスキップ
+                continue  # 半角スペースが1つだけの場合はスキップ
 
             # 項目番号の後ろに全角または複数のスペースがある場合
             if re.match(r"[ 　]{2,}", after_item_number) or re.match(r"^[　]+", after_item_number):  
@@ -207,18 +221,10 @@ def complete_brackets(paragraph, log):
                     log.append(log_entry)
                     highlight_text(run)  # ハイライト適用
 
-        # レベル6のスペース削除処理
-        if re.match(level_patterns[6], original_text):
-            # ピリオドの後ろのスペース削除
-            new_text = re.sub(r"\.\s+[ 　]*", ".", original_text)
-            if new_text != original_text:
-                w_t.text = new_text
-                log_entry = f"レベル6スペース削除: '{original_text}' -> '{new_text}'"
-                log.append(log_entry)
-                highlight_text(run)  # ハイライト適用
-
 def remove_leading_spaces(paragraph, log):
-    """<w:t>要素の先頭に全角・半角スペースがある場合、それを削除する処理"""
+    """
+    <w:t>要素の先頭に全角・半角スペースがある場合、それを削除する処理
+    """
     runs = paragraph.findall(".//w:r", namespaces=ns)
     
     for run in runs:
@@ -236,7 +242,9 @@ def remove_leading_spaces(paragraph, log):
             highlight_text(run)
 
 def process_brackets_in_xml(xml_content):
-    """XML文書を解析し、全体の補完処理を実行"""
+    """
+    XML文書を解析し、全体の補完処理を実行
+    """
     try:
         parser = ET.XMLParser(remove_blank_text=True)
         tree = ET.fromstring(xml_content.encode('utf-8'), parser)
@@ -246,29 +254,31 @@ def process_brackets_in_xml(xml_content):
     log = []
 
     for paragraph in tree.findall(".//w:p", namespaces=ns):
-        complete_brackets(paragraph, log)  # レベル5,7,8,9のカッコ補完とスペース処理
-        process_numbering(paragraph, log)  # レベル1〜4の処理（変更なし）
-        process_fullwidth_alphabet_period(paragraph, log)  # ピリオド修正の追加処理
+        adjust_brackets_level5_9(paragraph, log)  # レベル5,7,8,9のカッコ補完とスペース処理
+        adjust_space_level1_4(paragraph, log)  # レベル1〜4の処理（変更なし）
+        adjust_level6(paragraph, log)  # レベル6の処理
         remove_leading_spaces(paragraph, log)
 
     return ET.tostring(tree, encoding='unicode', pretty_print=True), log
 
-# XMLファイルの読み込みと処理
-xml_file_path = "xml_new/word/document.xml"
-with open(xml_file_path, "r", encoding="utf-8") as file:
-    xml_content = file.read()
+# このスクリプトが直接実行された場合のみ、以下のコードが動作するようにする
+if __name__ == "__main__":
+    # XMLファイルの読み込みと処理
+    xml_file_path = "xml_new/word/document.xml"
+    with open(xml_file_path, "r", encoding="utf-8") as file:
+        xml_content = file.read()
 
-# XML解析と補完処理の実行
-updated_xml, log = process_brackets_in_xml(xml_content)
+    # XML解析と補完処理の実行
+    updated_xml, log = process_brackets_in_xml(xml_content)
 
-# 修正されたXMLを保存
-with open(xml_file_path, "w", encoding="utf-8") as file:
-    file.write(updated_xml)
+    # 修正されたXMLを保存
+    with open(xml_file_path, "w", encoding="utf-8") as file:
+        file.write(updated_xml)
 
-# ログの出力（変換された部分のみ）
-log_file_path = "bracket_completion_log.txt"
-with open(log_file_path, "w", encoding="utf-8") as file:
-    for entry in log:
-        file.write(entry + "\n")
+    # ログの出力（変換された部分のみ）
+    log_file_path = "bracket_completion_log.txt"
+    with open(log_file_path, "w", encoding="utf-8") as file:
+        for entry in log:
+            file.write(entry + "\n")
 
-print(f"処理が完了しました。ログは {log_file_path} に保存されました。")
+    print(f"処理が完了しました。ログは {log_file_path} に保存されました。")

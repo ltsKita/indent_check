@@ -1,3 +1,9 @@
+"""
+このファイルではインデントレベルの修正を行います。
+インデントルールの適用にあたり、全てのインデントの再設定を実施する処理となるため文書全体が変更範囲とみなされます。
+そのため、ここではハイライト処理を行っていません。
+"""
+
 import re
 import xml.etree.ElementTree as ET
 
@@ -39,6 +45,48 @@ indent_settings_paragraphs = {
     8: {"w:leftChars": "400", "w:left": "960", "w:firstLineChars": "100", "w:firstLine": "240"},
     9: {"w:leftChars": "500", "w:left": "1200", "w:firstLineChars": "100", "w:firstLine": "240"}
 }
+def has_previous_paragraph_drawing(paragraph, root):
+    """
+    現在の段落の一つ前の段落に<w:drawing>タグがあり、その段落に「図」または「表」のキーワードが
+    含まれている場合にTrueを返す。含まれていない場合はFalseを返す。
+    """
+    # 現在の段落 (w:p) の前の段落を取得
+    paragraphs = list(root.findall(".//w:p", namespaces=ns))
+    current_index = paragraphs.index(paragraph)
+
+    # 最初の段落の場合、前の段落は存在しないのでFalseを返す
+    if current_index == 0:
+        return False
+
+    # 一つ前の段落を取得
+    previous_paragraph = paragraphs[current_index - 1]
+    current_paragraph = paragraph
+
+    # その段落内に<w:drawing>タグがあるかを確認
+    drawing = previous_paragraph.find(".//w:drawing", namespaces=ns)
+    
+    # <w:drawing>がなければFalseを返す
+    if drawing is None:
+        return False
+
+    # <w:t>のテキストをすべて取得して結合
+    current_paragraph_text = extract_text_from_paragraph(current_paragraph)
+
+    # 「図」または「表」が含まれていればTrueを返す
+    if "図" in current_paragraph_text or "表" in current_paragraph_text:
+        if drawing is not None:
+            print(current_paragraph_text)
+        return True
+
+    return False
+
+def extract_text_from_paragraph(paragraph):
+    """
+    段落 (w:p) の中にある<w:t>要素のテキストをすべて結合して返す。
+    """
+    return "".join([t.text for t in paragraph.findall(".//w:t", namespaces=ns) if t.text])
+
+
 
 def parse_paragraph(paragraph):
     """
@@ -84,7 +132,7 @@ def update_indent(paragraph, level, is_number):
         for attr, value in settings.items():
             new_ind.set(attr, value)
 
-def process_xml(xml_content):
+def update_indent_level(xml_content):
     """
     XML文書を解析し、各段落に対して項目番号やインデントを適用する。
     処理結果をXMLとして返し、処理ログも返す。
@@ -98,6 +146,9 @@ def process_xml(xml_content):
     log = []
 
     for paragraph in root.findall(".//w:p", namespaces=ns):
+        if has_previous_paragraph_drawing(paragraph, root):
+            # 今の段落に含まれる<w:t>タグのテキストを取得してログに追加
+            continue #インデント処理を行わない
         level, item_number = parse_paragraph(paragraph)
 
         if level is not None:
@@ -123,21 +174,23 @@ def process_xml(xml_content):
     # 修正済みのXMLを返す
     return ET.tostring(root, encoding='unicode'), log
 
-# XMLファイルの内容を読み込み
-xml_file_path = "xml_new/word/document.xml"
-with open(xml_file_path, "r", encoding="utf-8") as file:
-    xml_content = file.read()
+# このスクリプトが直接実行された場合のみ、以下のコードが動作するようにする
+if __name__ == "__main__":
+    # XMLファイルの内容を読み込み
+    xml_file_path = "xml_new/word/document.xml"
+    with open(xml_file_path, "r", encoding="utf-8") as file:
+        xml_content = file.read()
 
-# XML解析の実行
-updated_xml, log = process_xml(xml_content)
+    # XML解析の実行
+    updated_xml, log = update_indent_level(xml_content)
 
-# 修正されたXMLを保存
-with open(xml_file_path, "w", encoding="utf-8") as file:
-    file.write(updated_xml)
+    # 修正されたXMLを保存
+    with open(xml_file_path, "w", encoding="utf-8") as file:
+        file.write(updated_xml)
 
-# ログの出力
-log_file_path = "indentation_log.txt"
-with open(log_file_path, "w", encoding="utf-8") as file:
-    file.write("\n".join(log))
+    # ログの出力
+    log_file_path = "indentation_log.txt"
+    with open(log_file_path, "w", encoding="utf-8") as file:
+        file.write("\n".join(log))
 
-print(f"処理が完了しました。ログは {log_file_path} に保存されました。")
+    print(f"処理が完了しました。ログは {log_file_path} に保存されました。")

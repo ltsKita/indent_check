@@ -1,8 +1,17 @@
+"""
+このファイルではwordファイルをxmlファイルに分割する。
+項目番号を把握しやすくなるよう、結合可能な<w:t>要素は結合を行なっている。
+この方法では図表内のテキストを取得できないが、処理対象となる項目番号は図表内には存在しないため図表内の情報は取得せずそのまま保持する形をとっている。
+ただし、図表が存在しているか否かの検知は行う。
+"""
 import zipfile
 import os
 from lxml import etree as ET
 
 def get_docx_file(data_dir):
+    """
+    指定ディレクトリ内のwordファイルを取得する
+    """
     docx_files = [f for f in os.listdir(data_dir) if f.endswith('.docx')]
     
     if not docx_files:
@@ -12,6 +21,9 @@ def get_docx_file(data_dir):
     return os.path.join(data_dir, docx_files[0])
 
 def extract_docx_to_xml(docx_file, output_dir):
+    """
+    wordファイルをxmlファイルに変換する
+    """
     if docx_file is None:
         print("有効な.docxファイルが指定されていません")
         return
@@ -107,7 +119,6 @@ def extract_docx_to_xml(docx_file, output_dir):
 
 
 if __name__ == "__main__":
-    # 使用例
     docx_file = get_docx_file("data")
     extract_docx_to_xml(docx_file, "xml/")
     extract_docx_to_xml(docx_file, "xml_new/")

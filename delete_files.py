@@ -1,10 +1,13 @@
+"""
+実行時に作成したファイルを全て削除します。
+"""
 import os
 import shutil
 
 def delete_files_and_directories():
     # 削除対象のディレクトリとファイル
     directories = ['xml', 'xml_new']
-    files = ['bracket_completion_log.txt', 'indentation_log.txt']
+    files = ['bracket_completion_log.txt', 'indentation_log.txt','indentation_log_level_1_to_4.txt','indentation_log_level_5_to_9.txt']
 
     # ディレクトリの削除
     for directory in directories:
